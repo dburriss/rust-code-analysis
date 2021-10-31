@@ -5,55 +5,52 @@ YELLOW=$'\e[1;33m'
 BLUE=$'\e[0;34m'
 STOP=$'\e[m'
 
-LINK_REG='\[[^][ ]+]\((https?:\/\/[^()]+)\)'                          # regex for finding md links
-declare -a FILES                                                      # indexed array
+MD_LINK_REGEX='\[[^][ ]+]\((https?:\/\/[^()]+)\)'                     # regex for finding md links in text
+declare -a FILES                                                      # indexed array of MD files
 readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
-
-printf 'Scanning %s\n' "${FILES[0]}"
-CUR_FILE="${FILES[0]}"
-#grep -oP -e LINK_REG "${FILES[0]}"
-
-FILE="./rust-code-analysis-book/src/developers/new-language.md"
-echo "$YELLOW Scanning $FILE $STOP"
-FILE_MD_LINKS=($(grep -oE "${LINK_REG}" "${FILE}"))                   # -E extended regex, -o output only match
-#echo "${FILE_MD_LINKS[0]}"
-# foreach file get links in it
-#grep -oP "\[\K([^]]*)" <<< "${FILE_MD_LINKS[0]}"
-for MD_LINK in "${FILE_MD_LINKS[@]}";
+for FILE in "${FILES[@]}"
 do
-echo "$BLUE $MD_LINK $STOP"
-# check URI
-URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
+  echo "$YELLOW Scanning $FILE $STOP"
+  FILE_MD_LINKS=($(grep -oE "${MD_LINK_REGEX}" "${FILE}"))                   # -E extended regex, -o output only match
+  #echo "${FILE_MD_LINKS[0]}"
+  # foreach file get links in it
+  #grep -oP "\[\K([^]]*)" <<< "${FILE_MD_LINKS[0]}"
+  for MD_LINK in "${FILE_MD_LINKS[@]}";
+  do
+  echo "  Found:$BLUE $MD_LINK $STOP"
 
-if [[ $URI = http* ]]
-then
-  #echo "Check URI ${URI}"
-  if curl -s --head  --request GET "${URI}" | grep "404 Not Found" > /dev/null
+  # check URI
+  URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
+  if [[ $URI = http* ]]
   then
-    echo "$RED  BAD URL ${URI} $STOP"
+    REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
+    echo "HTTP Status $REQ"
+    if [[ $((REQ)) -ge 399 ]]
+    then
+      echo "  $RED BAD URL$STOP ${URI}"
+    fi
   fi
-fi
 
-# check path
-FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
-if [[ ${FILE_PATH:0:1} = "/" ]]
-then
-  # echo "Check PATH ${FILE_PATH}"
-  # trim /
-  FILE_PATH="${FILE_PATH:1}"
-  # echo "Check FILE_PATH ${FILE_PATH}"
-  # TEST_PATH=$(readlink -f "$FILE_PATH")
-  if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
+  # check path
+  FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
+  if [[ ${FILE_PATH:0:1} = "/" ]]
   then
-    echo "$RED  BAD PATH ${FILE_PATH} $STOP"
+    # trim /
+    FILE_PATH="${FILE_PATH:1}"
+    if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
+    then
+      echo "  $RED BAD PATH$STOP ${FILE_PATH}"
+    fi
   fi
-fi
+  done
 done
+
+
 
   # test URI is not 404
 # for text part if starts with / and ends with .rs check if it exists
 
 # for each link check that it is not 404
 
-# TODO: handle exitcode if something wrong
-# TODO: keep cache of checked values
+# handle exitcode if something wrong
+# keep cache of checked values
