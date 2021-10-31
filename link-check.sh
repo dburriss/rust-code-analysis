@@ -4,17 +4,16 @@ GREEN=$'\e[0;32m'
 YELLOW=$'\e[1;33m'
 BLUE=$'\e[0;34m'
 STOP=$'\e[m'
-
-MD_LINK_REGEX='\[[^][ ]+]\((https?:\/\/[^()]+)\)'                     # regex for finding md links in text
+COUNT=0
+MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                     # regex for finding md links in text
 declare -a FILES                                                      # indexed array of MD files
 readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
 for FILE in "${FILES[@]}"
 do
   echo "$YELLOW Scanning $FILE $STOP"
-  FILE_MD_LINKS=($(grep -oE "${MD_LINK_REGEX}" "${FILE}"))                   # -E extended regex, -o output only match
-  #echo "${FILE_MD_LINKS[0]}"
-  # foreach file get links in it
-  #grep -oP "\[\K([^]]*)" <<< "${FILE_MD_LINKS[0]}"
+  declare -a FILE_MD_LINKS
+  readarray -t FILE_MD_LINKS < <(grep -oP "${MD_LINK_REGEX}" "${FILE}")                   # -E extended regex, -o output only match
+  COUNT=$(($COUNT+${#FILE_MD_LINKS[*]}))
   for MD_LINK in "${FILE_MD_LINKS[@]}";
   do
   echo "  Found:$BLUE $MD_LINK $STOP"
@@ -24,7 +23,6 @@ do
   if [[ $URI = http* ]]
   then
     REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
-    echo "HTTP Status $REQ"
     if [[ $((REQ)) -ge 399 ]]
     then
       echo "  $RED BAD URL$STOP ${URI}"
@@ -45,7 +43,7 @@ do
   done
 done
 
-
+echo "Total links found $COUNT"
 
   # test URI is not 404
 # for text part if starts with / and ends with .rs check if it exists
@@ -54,3 +52,4 @@ done
 
 # handle exitcode if something wrong
 # keep cache of checked values
+# what if not a leading / but still a path
