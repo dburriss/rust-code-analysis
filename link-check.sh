@@ -5,6 +5,7 @@ YELLOW=$'\e[1;33m'
 BLUE=$'\e[0;34m'
 STOP=$'\e[m'
 COUNT=0
+EXIT=0
 MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                     # regex for finding md links in text
 declare -a FILES                                                      # indexed array of MD files
 readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
@@ -23,9 +24,12 @@ do
   if [[ $URI = http* ]]
   then
     REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
-    if [[ $((REQ)) -ge 399 ]]
+    if [[ ! $((REQ)) -eq 200 ]]
     then
       echo "  $RED BAD URL$STOP ${URI}"
+      EXIT=1
+    else
+      echo "HTTP status $REQ"
     fi
   fi
 
@@ -38,6 +42,7 @@ do
     if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
     then
       echo "  $RED BAD PATH$STOP ${FILE_PATH}"
+      EXIT=1
     fi
   fi
   done
@@ -45,11 +50,7 @@ done
 
 echo "Total links found $COUNT"
 
-  # test URI is not 404
-# for text part if starts with / and ends with .rs check if it exists
+exit $EXIT
 
-# for each link check that it is not 404
-
-# handle exitcode if something wrong
 # keep cache of checked values
 # what if not a leading / but still a path
