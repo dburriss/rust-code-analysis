@@ -1,6 +1,7 @@
 #!/bin/bash
 
-COUNT=0
+FILE_COUNT=0
+MD_LINK_COUNT=0
 PATH_COUNT=0
 PATH_FAIL_COUNT=0
 URI_COUNT=0
@@ -14,6 +15,7 @@ function success () {
 }
 function info () {
   local YELLOW=$'\e[1;33m'
+  local STOP=$'\e[m'
   echo "$YELLOW$1$STOP"
 }
 function trace () {
@@ -48,12 +50,13 @@ fi
 debug "Verbose $VERBOSE"
 declare -a FILES                                                      # indexed array of MD files
 readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
+FILE_COUNT=$(($FILE_COUNT+${#FILES[*]}))
 for FILE in "${FILES[@]}"
 do
   info "Scanning $FILE"
   declare -a FILE_MD_LINKS
   readarray -t FILE_MD_LINKS < <(grep -oP "${MD_LINK_REGEX}" "${FILE}")                   # -E extended regex, -o output only match
-  COUNT=$(($COUNT+${#FILE_MD_LINKS[*]}))
+  MD_LINK_COUNT=$(($MD_LINK_COUNT+${#FILE_MD_LINKS[*]}))
   for MD_LINK in "${FILE_MD_LINKS[@]}";
   do
     trace "  Found: $MD_LINK" $VERBOSE
@@ -94,25 +97,23 @@ do
     fi
   done
 done
-echo "============================="
-info "Total MD links found: $COUNT"
+echo "====================================="
+info "Found $MD_LINK_COUNT MD links across $FILE_COUNT files."
 
-info "Links checked: $URI_COUNT"
 if [[ $URI_FAIL_COUNT == 0 ]]
 then
-  success "Failed links: $URI_FAIL_COUNT"
+  success "Failed links: $URI_FAIL_COUNT/$URI_COUNT"
 else
-  error "Failed links: $URI_FAIL_COUNT"
+  error "Failed links: $URI_FAIL_COUNT/$URI_COUNT"
 fi
 
-info "Paths checked: $PATH_COUNT"
 if [[ $PATH_FAIL_COUNT == 0 ]]
 then
-  success "Failed paths: $PATH_FAIL_COUNT"
+  success "Failed paths: $PATH_FAIL_COUNT/$PATH_COUNT"
 else
-  error "Failed paths: $PATH_FAIL_COUNT"
+  error "Failed paths: $PATH_FAIL_COUNT/$PATH_COUNT"
 fi
-echo "============================="
+echo "====================================="
 exit $EXIT
 
 # keep cache of checked values
