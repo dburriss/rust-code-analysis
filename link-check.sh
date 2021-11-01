@@ -55,31 +55,18 @@ function error () {
   echo "$RED$1$stop"
 }
 
-# set logging verbosity level
-if [[ $1 = "-v" ]]
-then verbose=1
-elif [[ $1 = "-vv" ]]
-then verbose=2
-else verbose=0
-fi
-
-debug "Verbose $verbose"
-
-declare -a files                                                          # indexed array of MD files
-readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
-file_count=$(($file_count+${#files[*]}))
-for file in "${files[@]}"
-do
+function check_file () {
+  file=$1
   info "Scanning $file"
   declare -a file_md_links
   readarray -t file_md_links < <(grep -oP "${MD_LINK_REGEX}" "${file}")   # -P Perl regex, -o output only match
   md_link_count=$(($md_link_count+${#file_md_links[*]}))
-  for MD_LINK in "${file_md_links[@]}";
+  for md_link in "${file_md_links[@]}";
   do
-    trace "  Found: $MD_LINK" $verbose
+    trace "  Found: $md_link" $verbose
 
     # check uri
-    uri=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
+    uri=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${md_link}")
     if [[ $uri = http* ]]
     then
       uri_count=$(($uri_count+1))
@@ -95,7 +82,7 @@ do
     fi
 
     # check path
-    file_path=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
+    file_path=$(grep -oP "\[\K([^]]*)" <<< "${md_link}")
     if [[ "$file_path" == */* || "$file_path" == *.* ]]
     then
       path_count=$(($path_count+1))
@@ -113,6 +100,24 @@ do
       fi
     fi
   done
+}
+
+# set logging verbosity level
+if [[ $1 = "-v" ]]
+then verbose=1
+elif [[ $1 = "-vv" ]]
+then verbose=2
+else verbose=0
+fi
+
+debug "Verbose $verbose"
+
+declare -a files                                                          # indexed array of MD files
+readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
+file_count=$(($file_count+${#files[*]}))
+for file in "${files[@]}"
+do
+  check_file $file
 done
 
 # Print our report
