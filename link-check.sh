@@ -1,119 +1,138 @@
 #!/bin/bash
 
-FILE_COUNT=0
-MD_LINK_COUNT=0
-PATH_COUNT=0
-PATH_FAIL_COUNT=0
-URI_COUNT=0
-URI_FAIL_COUNT=0
-EXIT=0
+# accumulators and constants
 MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                        # regex for finding md links in text
+file_count=0
+md_link_count=0
+path_count=0
+path_fail_count=0
+uri_count=0
+uri_fail_count=0
+exit_code=0
+
+# success log - always prints
+# param 1: string to log
 function success () {
-  local GREEN=$'\e[0;32m'
-  local STOP=$'\e[m'
-  echo "$GREEN$1$STOP"
+  local green=$'\e[0;32m'
+  local stop=$'\e[m'
+  echo "$green$1$stop"
 }
+
+# info log - always prints
+# param 1: string to log
 function info () {
-  local YELLOW=$'\e[1;33m'
-  local STOP=$'\e[m'
-  echo "$YELLOW$1$STOP"
+  local yellow=$'\e[1;33m'
+  local stop=$'\e[m'
+  echo "$yellow$1$stop"
 }
+
+# trace log -
+# param 1: string to log
 function trace () {
   local BLUE=$'\e[0;34m'
-  local STOP=$'\e[m'
-  local VERBOSE=$(($2))
-  if [ $VERBOSE -ge 1 ]
+  local stop=$'\e[m'
+  local verbose=$(($2))
+  if [ $verbose -ge 1 ]
   then
-  echo "$BLUE$1$STOP"
+  echo "$BLUE$1$stop"
   fi
 }
+
+# debug log - prints
+# param 1: string to log
+# Always prints
 function debug () {
-  local VERBOSE=$(($2))
-  if [ $VERBOSE -ge 2 ]
+  local verbose=$(($2))
+  if [ $verbose -ge 2 ]
   then
   echo "$1"
   fi
 }
+
 function error () {
   local RED=$'\e[1;31m'
-  local STOP=$'\e[m'
-  echo "$RED$1$STOP"
+  local stop=$'\e[m'
+  echo "$RED$1$stop"
 }
 
+# set logging verbosity level
 if [[ $1 = "-v" ]]
-then VERBOSE=1
+then verbose=1
 elif [[ $1 = "-vv" ]]
-then VERBOSE=2
-else VERBOSE=0
+then verbose=2
+else verbose=0
 fi
 
-debug "Verbose $VERBOSE"
-declare -a FILES                                                      # indexed array of MD files
-readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
-FILE_COUNT=$(($FILE_COUNT+${#FILES[*]}))
-for FILE in "${FILES[@]}"
-do
-  info "Scanning $FILE"
-  declare -a FILE_MD_LINKS
-  readarray -t FILE_MD_LINKS < <(grep -oP "${MD_LINK_REGEX}" "${FILE}")                   # -E extended regex, -o output only match
-  MD_LINK_COUNT=$(($MD_LINK_COUNT+${#FILE_MD_LINKS[*]}))
-  for MD_LINK in "${FILE_MD_LINKS[@]}";
-  do
-    trace "  Found: $MD_LINK" $VERBOSE
+debug "Verbose $verbose"
 
-    # check URI
-    URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
-    if [[ $URI = http* ]]
+declare -a files                                                          # indexed array of MD files
+readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
+file_count=$(($file_count+${#files[*]}))
+for file in "${files[@]}"
+do
+  info "Scanning $file"
+  declare -a file_md_links
+  readarray -t file_md_links < <(grep -oP "${MD_LINK_REGEX}" "${file}")   # -P Perl regex, -o output only match
+  md_link_count=$(($md_link_count+${#file_md_links[*]}))
+  for MD_LINK in "${file_md_links[@]}";
+  do
+    trace "  Found: $MD_LINK" $verbose
+
+    # check uri
+    uri=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
+    if [[ $uri = http* ]]
     then
-      URI_COUNT=$(($URI_COUNT+1))
-      REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
-      if [[ ! $((REQ)) == 200 ]]
+      uri_count=$(($uri_count+1))
+      req=$(curl -LI "${uri}" -o /dev/null -w '%{http_code}\n' -s)
+      if [[ ! $((req)) == 200 ]]
       then
-        EXIT=1
-        error "   BAD URL ${URI}"
-        URI_FAIL_COUNT=$(($URI_FAIL_COUNT+1))
+        exit_code=1
+        error "    BAD URL ${uri}"
+        uri_fail_count=$(($uri_fail_count+1))
       else
-        debug "    HTTP status $REQ ($URI)" $VERBOSE
+        debug "    HTTP status $req ($uri)" $verbose
       fi
     fi
 
     # check path
-    FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
-    if [[ "$FILE_PATH" == */* || "$FILE_PATH" == *.* ]]
+    file_path=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
+    if [[ "$file_path" == */* || "$file_path" == *.* ]]
     then
-      PATH_COUNT=$(($PATH_COUNT+1))
-      if [[ "${FILE_PATH:0:1}" == "/" ]]
+      path_count=$(($path_count+1))
+      if [[ "${file_path:0:1}" == "/" ]]
       then
-        FILE_PATH="${FILE_PATH:1}"
+        file_path="${file_path:1}"
       fi
-      if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
+      if [[ ! -f $file_path && ! -d $file_path ]]
       then
-        EXIT=1
-        error "   BAD PATH ${FILE_PATH}"
-        PATH_FAIL_COUNT=$(($PATH_FAIL_COUNT+1))
+        exit_code=1
+        error "    BAD PATH ${file_path}"
+        path_fail_count=$(($path_fail_count+1))
       else
-        debug "    File found: $FILE_PATH" $VERBOSE
+        debug "    File found: $file_path" $verbose
       fi
     fi
   done
 done
-echo "====================================="
-info "Found $MD_LINK_COUNT MD links across $FILE_COUNT files."
 
-if [[ $URI_FAIL_COUNT == 0 ]]
+# Print our report
+echo "====================================="
+info "Found $md_link_count MD links across $file_count files."
+
+if [[ $uri_fail_count == 0 ]]
 then
-  success "Failed links: $URI_FAIL_COUNT/$URI_COUNT"
+  success "Failed links: $uri_fail_count/$uri_count"
 else
-  error "Failed links: $URI_FAIL_COUNT/$URI_COUNT"
+  error "Failed links: $uri_fail_count/$uri_count"
 fi
 
-if [[ $PATH_FAIL_COUNT == 0 ]]
+if [[ $path_fail_count == 0 ]]
 then
-  success "Failed paths: $PATH_FAIL_COUNT/$PATH_COUNT"
+  success "Failed paths: $path_fail_count/$path_count"
 else
-  error "Failed paths: $PATH_FAIL_COUNT/$PATH_COUNT"
+  error "Failed paths: $path_fail_count/$path_count"
 fi
 echo "====================================="
-exit $EXIT
+exit $exit_code
 
-# keep cache of checked values
+# possible improvement keep cache of checked values?
