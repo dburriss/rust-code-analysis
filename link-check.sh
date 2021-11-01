@@ -1,9 +1,5 @@
 #!/bin/bash
-RED=$'\e[1;31m'
-GREEN=$'\e[0;32m'
-YELLOW=$'\e[1;33m'
-BLUE=$'\e[0;34m'
-STOP=$'\e[m'
+
 COUNT=0
 PATH_COUNT=0
 PATH_FAIL_COUNT=0
@@ -12,12 +8,17 @@ URI_FAIL_COUNT=0
 EXIT=0
 MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                        # regex for finding md links in text
 function success () {
+  local GREEN=$'\e[0;32m'
+  local STOP=$'\e[m'
   echo "$GREEN$1$STOP"
 }
 function info () {
+  local YELLOW=$'\e[1;33m'
   echo "$YELLOW$1$STOP"
 }
 function trace () {
+  local BLUE=$'\e[0;34m'
+  local STOP=$'\e[m'
   local VERBOSE=$(($2))
   if [ $VERBOSE -ge 1 ]
   then
@@ -32,6 +33,8 @@ function debug () {
   fi
 }
 function error () {
+  local RED=$'\e[1;31m'
+  local STOP=$'\e[m'
   echo "$RED$1$STOP"
 }
 
