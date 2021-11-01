@@ -5,8 +5,15 @@ YELLOW=$'\e[1;33m'
 BLUE=$'\e[0;34m'
 STOP=$'\e[m'
 COUNT=0
+PATH_COUNT=0
+PATH_FAIL_COUNT=0
+URI_COUNT=0
+URI_FAIL_COUNT=0
 EXIT=0
 MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                        # regex for finding md links in text
+function success () {
+  echo "$GREEN$1$STOP"
+}
 function info () {
   echo "$YELLOW$1$STOP"
 }
@@ -35,7 +42,7 @@ then VERBOSE=2
 else VERBOSE=0
 fi
 
-echo "Verbose $VERBOSE"
+debug "Verbose $VERBOSE"
 declare -a FILES                                                      # indexed array of MD files
 readarray -t FILES < <(find ./rust-code-analysis-book -name "*.md")   # get the markdown files
 for FILE in "${FILES[@]}"
@@ -52,11 +59,13 @@ do
     URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
     if [[ $URI = http* ]]
     then
+      URI_COUNT=$(($URI_COUNT+1))
       REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
       if [[ ! $((REQ)) == 200 ]]
       then
-        error "    BAD URL ${URI}"
         EXIT=1
+        error "   BAD URL ${URI}"
+        URI_FAIL_COUNT=$(($URI_FAIL_COUNT+1))
       else
         debug "    HTTP status $REQ ($URI)" $VERBOSE
       fi
@@ -66,23 +75,41 @@ do
     FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
     if [[ "$FILE_PATH" == */* || "$FILE_PATH" == *.* ]]
     then
+      PATH_COUNT=$(($PATH_COUNT+1))
       if [[ "${FILE_PATH:0:1}" == "/" ]]
       then
         FILE_PATH="${FILE_PATH:1}"
       fi
       if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
       then
-        error "  $RED BAD PATH$STOP ${FILE_PATH}"
         EXIT=1
+        error "   BAD PATH ${FILE_PATH}"
+        PATH_FAIL_COUNT=$(($PATH_FAIL_COUNT+1))
       else
         debug "    File found: $FILE_PATH" $VERBOSE
       fi
     fi
   done
 done
+echo "============================="
+info "Total MD links found: $COUNT"
 
-echo "Total MD links found $COUNT"
+info "Links checked: $URI_COUNT"
+if [[ $URI_FAIL_COUNT == 0 ]]
+then
+  success "Failed links: $URI_FAIL_COUNT"
+else
+  error "Failed links: $URI_FAIL_COUNT"
+fi
 
+info "Paths checked: $PATH_COUNT"
+if [[ $PATH_FAIL_COUNT == 0 ]]
+then
+  success "Failed paths: $PATH_FAIL_COUNT"
+else
+  error "Failed paths: $PATH_FAIL_COUNT"
+fi
+echo "============================="
 exit $EXIT
 
 # keep cache of checked values
