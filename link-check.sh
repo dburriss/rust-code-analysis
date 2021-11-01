@@ -26,7 +26,7 @@ function info () {
   echo "$yellow$1$stop"
 }
 
-# trace log -
+# trace log - prints when verbosity on 1 or higher
 # param 1: string to log
 function trace () {
   local BLUE=$'\e[0;34m'
@@ -38,9 +38,8 @@ function trace () {
   fi
 }
 
-# debug log - prints
+# debug log - prints when verbosity on 2
 # param 1: string to log
-# Always prints
 function debug () {
   local verbose=$(($2))
   if [ $verbose -ge 2 ]
@@ -49,12 +48,60 @@ function debug () {
   fi
 }
 
+# error - always prints but should be used only for errors
+# param 1: string to log
 function error () {
   local RED=$'\e[1;31m'
   local stop=$'\e[m'
   echo "$RED$1$stop"
 }
 
+# check_uri - pulls out the link and checks returns 200 OK
+# param 1: markdown link string eg "[desc](link)"
+function check_uri () {
+  # check uri
+  md_link=$1
+  uri=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${md_link}")
+  if [[ $uri = http* ]]
+  then
+    uri_count=$(($uri_count+1))
+    req=$(curl -LI "${uri}" -o /dev/null -w '%{http_code}\n' -s)
+    if [[ ! $((req)) == 200 ]]
+    then
+      exit_code=1
+      error "    BAD URL ${uri}"
+      uri_fail_count=$(($uri_fail_count+1))
+    else
+      debug "    HTTP status $req ($uri)" $verbose
+    fi
+  fi
+}
+
+# check_path - checks if desc points to a local file or directory and checks it is valid
+# param 1: markdown link string eg "[desc](link)"
+function check_path () {
+  md_link=$1
+  file_path=$(grep -oP "\[\K([^]]*)" <<< "${md_link}")
+  if [[ "$file_path" == */* || "$file_path" == *.* ]]
+  then
+    path_count=$(($path_count+1))
+    if [[ "${file_path:0:1}" == "/" ]]
+    then
+      file_path="${file_path:1}"
+    fi
+    if [[ ! -f $file_path && ! -d $file_path ]]
+    then
+      exit_code=1
+      error "    BAD PATH ${file_path}"
+      path_fail_count=$(($path_fail_count+1))
+    else
+      debug "    File found: $file_path" $verbose
+    fi
+  fi
+}
+
+# check_file - checks the path and link of all markdown links in the file
+# param 2: the markdown file to check
 function check_file () {
   file=$1
   info "Scanning $file"
@@ -65,40 +112,9 @@ function check_file () {
   do
     trace "  Found: $md_link" $verbose
 
-    # check uri
-    uri=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${md_link}")
-    if [[ $uri = http* ]]
-    then
-      uri_count=$(($uri_count+1))
-      req=$(curl -LI "${uri}" -o /dev/null -w '%{http_code}\n' -s)
-      if [[ ! $((req)) == 200 ]]
-      then
-        exit_code=1
-        error "    BAD URL ${uri}"
-        uri_fail_count=$(($uri_fail_count+1))
-      else
-        debug "    HTTP status $req ($uri)" $verbose
-      fi
-    fi
+    check_uri "$md_link"
+    check_path "$md_link"
 
-    # check path
-    file_path=$(grep -oP "\[\K([^]]*)" <<< "${md_link}")
-    if [[ "$file_path" == */* || "$file_path" == *.* ]]
-    then
-      path_count=$(($path_count+1))
-      if [[ "${file_path:0:1}" == "/" ]]
-      then
-        file_path="${file_path:1}"
-      fi
-      if [[ ! -f $file_path && ! -d $file_path ]]
-      then
-        exit_code=1
-        error "    BAD PATH ${file_path}"
-        path_fail_count=$(($path_fail_count+1))
-      else
-        debug "    File found: $file_path" $verbose
-      fi
-    fi
   done
 }
 
@@ -112,6 +128,7 @@ fi
 
 debug "Verbose $verbose"
 
+# get all markdown files and check them
 declare -a files                                                          # indexed array of MD files
 readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
 file_count=$(($file_count+${#files[*]}))
@@ -126,16 +143,16 @@ info "Found $md_link_count MD links across $file_count files."
 
 if [[ $uri_fail_count == 0 ]]
 then
-  success "Failed links: $uri_fail_count/$uri_count"
+  success "Broken links: $uri_fail_count/$uri_count"
 else
-  error "Failed links: $uri_fail_count/$uri_count"
+  error "Broken links: $uri_fail_count/$uri_count"
 fi
 
 if [[ $path_fail_count == 0 ]]
 then
-  success "Failed paths: $path_fail_count/$path_count"
+  success "Broken paths: $path_fail_count/$path_count"
 else
-  error "Failed paths: $path_fail_count/$path_count"
+  error "Broken paths: $path_fail_count/$path_count"
 fi
 echo "====================================="
 exit $exit_code
