@@ -46,42 +46,43 @@ do
   COUNT=$(($COUNT+${#FILE_MD_LINKS[*]}))
   for MD_LINK in "${FILE_MD_LINKS[@]}";
   do
-  trace "  Found: $MD_LINK" $VERBOSE
+    trace "  Found: $MD_LINK" $VERBOSE
 
-  # check URI
-  URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
-  if [[ $URI = http* ]]
-  then
-    REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
-    if [[ ! $((REQ)) == 200 ]]
+    # check URI
+    URI=$(grep -oP "\(\K(https?:\/\/[^()]+)" <<< "${MD_LINK}")
+    if [[ $URI = http* ]]
     then
-      error "    BAD URL ${URI}"
-      EXIT=1
-    else
-      debug "    HTTP status $REQ ($URI)" $VERBOSE
+      REQ=$(curl -LI "${URI}" -o /dev/null -w '%{http_code}\n' -s)
+      if [[ ! $((REQ)) == 200 ]]
+      then
+        error "    BAD URL ${URI}"
+        EXIT=1
+      else
+        debug "    HTTP status $REQ ($URI)" $VERBOSE
+      fi
     fi
-  fi
 
-  # check path
-  FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
-  if [[ ${FILE_PATH:0:1} = "/" ]]
-  then
-    # trim /
-    FILE_PATH="${FILE_PATH:1}"
-    if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
+    # check path
+    FILE_PATH=$(grep -oP "\[\K([^]]*)" <<< "${MD_LINK}")
+    if [[ "$FILE_PATH" == */* || "$FILE_PATH" == *.* ]]
     then
-      error "  $RED BAD PATH$STOP ${FILE_PATH}"
-      EXIT=1
-    else
-      debug "    File found: $FILE_PATH" $VERBOSE
+      if [[ "${FILE_PATH:0:1}" == "/" ]]
+      then
+        FILE_PATH="${FILE_PATH:1}"
+      fi
+      if [[ ! -f $FILE_PATH && ! -d $FILE_PATH ]]
+      then
+        error "  $RED BAD PATH$STOP ${FILE_PATH}"
+        EXIT=1
+      else
+        debug "    File found: $FILE_PATH" $VERBOSE
+      fi
     fi
-  fi
   done
 done
 
-echo "Total links found $COUNT"
+echo "Total MD links found $COUNT"
 
 exit $EXIT
 
 # keep cache of checked values
-# what if not a leading / but still a path
