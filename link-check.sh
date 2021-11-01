@@ -1,6 +1,20 @@
 #!/bin/bash
 
+#
+# This script checks the markdown links in all markdown files.
+# param 1: [optioal] [flag] -v or -vv to enable debugging or tracing
+# param 2: [optional] path to a specific file to check. If not present, will search for *.md
+# It will match all [desc](https?...) patterns in markdown files.
+# 'desc' can be a directory or file and it will check it exists.
+# exist code 1 if and files or links not found.
+# Examples:
+# ./link-check.sh -v
+# ./link-check.sh -vv ./rust-code-analysis-book/src/developers/new-language.md
+#
+
+#=============================
 # accumulators and constants
+#=============================
 MD_LINK_REGEX='\[[^][]+]\(https?:\/\/[^()]+\)'                        # regex for finding md links in text
 file_count=0
 md_link_count=0
@@ -9,6 +23,10 @@ path_fail_count=0
 uri_count=0
 uri_fail_count=0
 exit_code=0
+
+#=============================
+# general functions
+#=============================
 
 # success log - always prints
 # param 1: string to log
@@ -55,6 +73,10 @@ function error () {
   local stop=$'\e[m'
   echo "$RED$1$stop"
 }
+
+#=============================
+# script specific functions
+#=============================
 
 # check_uri - pulls out the link and checks returns 200 OK
 # param 1: markdown link string eg "[desc](link)"
@@ -118,6 +140,10 @@ function check_file () {
   done
 }
 
+#=============================
+# execute script
+#=============================
+
 # set logging verbosity level
 if [[ $1 = "-v" ]]
 then verbose=1
@@ -127,16 +153,25 @@ else verbose=0
 fi
 
 debug "Verbose $verbose"
-
-# get all markdown files and check them
-declare -a files                                                          # indexed array of MD files
-readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
-file_count=$(($file_count+${#files[*]}))
-for file in "${files[@]}"
-do
-  check_file $file
-done
-
+if [[ $verbose == 0 && "$1" == *.md ]] ; then single_md_file="$1" ; fi
+if [[ $verbose -gt 0 && "$2" == *.md ]] ; then single_md_file="$2" ; fi
+echo "file $single_md_file | $1 | $2"
+# if a md single file check that, else loop through all md files
+if [[ -v single_md_file ]]
+then
+  # single file
+  check_file "$single_md_file"
+  file_count=1
+else 
+  # get all markdown files and check them
+  declare -a files                                                          # indexed array of MD files
+  readarray -t files < <(find ./rust-code-analysis-book -name "*.md")       # get the markdown files
+  file_count=$(($file_count+${#files[*]}))
+  for file in "${files[@]}"
+  do
+    check_file $file
+  done
+fi
 # Print our report
 echo "====================================="
 info "Found $md_link_count MD links across $file_count files."
