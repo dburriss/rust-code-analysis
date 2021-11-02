@@ -6,10 +6,10 @@
 # param 2: [optional] path to a specific file to check. If not present, will search for *.md
 # It will match all [desc](https?...) patterns in markdown files.
 # 'desc' can be a directory or file and it will check it exists.
-# exist code 1 if and files or links not found.
+# exist code 1 if files or links not found.
 # Examples:
 # ./link-check.sh -v
-# ./link-check.sh -vv ./rust-code-analysis-book/src/developers/new-language.md
+# ./link-check.sh -vv ./path/to/markdown.md
 #
 
 #=============================
@@ -28,24 +28,24 @@ exit_code=0
 # general functions
 #=============================
 
-# success log - always prints
-# param 1: string to log
+# success - always prints
+# param 1: the string to print
 function success () {
   local green=$'\e[0;32m'
   local stop=$'\e[m'
   echo "$green$1$stop"
 }
 
-# info log - always prints
-# param 1: string to log
+# info - always prints
+# param 1: the string to print
 function info () {
   local yellow=$'\e[1;33m'
   local stop=$'\e[m'
   echo "$yellow$1$stop"
 }
 
-# trace log - prints when verbosity on 1 or higher
-# param 1: string to log
+# trace - prints when verbosity on 1 or higher
+# param 1: the string to print
 function trace () {
   local BLUE=$'\e[0;34m'
   local stop=$'\e[m'
@@ -56,8 +56,8 @@ function trace () {
   fi
 }
 
-# debug log - prints when verbosity on 2
-# param 1: string to log
+# debug - prints when verbosity on 2
+# param 1: the string to print
 function debug () {
   local verbose=$(($2))
   if [ $verbose -ge 2 ]
@@ -67,7 +67,7 @@ function debug () {
 }
 
 # error - always prints but should be used only for errors
-# param 1: string to log
+# param 1: the string to print
 function error () {
   local RED=$'\e[1;31m'
   local stop=$'\e[m'
@@ -123,7 +123,7 @@ function check_path () {
 }
 
 # check_file - checks the path and link of all markdown links in the file
-# param 2: the markdown file to check
+# param 2: the path to the markdown file to check
 function check_file () {
   file=$1
   info "Scanning $file"
@@ -191,5 +191,3 @@ else
 fi
 echo "====================================="
 exit $exit_code
-
-# possible improvement keep cache of checked values?
